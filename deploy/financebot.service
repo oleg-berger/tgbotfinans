@@ -1,0 +1,25 @@
+[Unit]
+Description=Private Telegram finance bot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=financebot
+Group=financebot
+WorkingDirectory=/opt/tgbotfinans
+EnvironmentFile=/opt/tgbotfinans/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/tgbotfinans/.venv/bin/python -m financebot
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/tgbotfinans/data /opt/tgbotfinans/backups
+
+[Install]
+WantedBy=multi-user.target

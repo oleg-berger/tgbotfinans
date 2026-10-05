@@ -1,0 +1,20 @@
+services:
+  financebot:
+    build: .
+    image: tgbotfinans:latest
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_PATH: /app/data/finance.sqlite3
+      BACKUP_DIR: /app/backups
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

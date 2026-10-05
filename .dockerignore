@@ -1,0 +1,7 @@
+*
+!requirements.txt
+!financebot/
+!financebot/**
+financebot/**/__pycache__/
+financebot/**/*.pyc
+financebot/**/*.pyo

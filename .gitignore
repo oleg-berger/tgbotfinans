@@ -1,0 +1,12 @@
+.venv/
+.env
+data/
+backups/
+*.db
+*.db-*
+*.sqlite*
+*.lock
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.log
