@@ -38,6 +38,28 @@ npm run check
 
 ## Публикация
 
+### Через Git и Cloudflare Dashboard
+
+Для Workers Builds настройте два Worker, подключенные к одному репозиторию и ветке `codex/cloudflare-workers`. Корневая папка сборки — **`cloudflare`**, а не корень репозитория. Исходники этой ветки и следующие изменения должны быть закоммичены и отправлены в Git перед сборкой.
+
+| Поле | Внутренний Worker | Публичный Worker |
+| --- | --- | --- |
+| Worker name | `tgbotfinans-core` | `tgbotfinans` |
+| Production branch | `codex/cloudflare-workers` | `codex/cloudflare-workers` |
+| Root directory | `cloudflare` | `cloudflare` |
+| Build command | `npm run build` | `npm run build` |
+| Deploy command | `npm run deploy:core` | `npm run deploy:frontend` |
+
+Сначала успешно опубликуйте `tgbotfinans-core`, затем запускайте сборку `tgbotfinans`: его binding ссылается на уже опубликованный core. Cloudflare устанавливает npm-зависимости по `package-lock.json`; команда `build` устанавливает закрепленный uv и готовит Python-модули, SDK, tzdata и изображения. В поле Deploy command укажите команду из соответствующего столбца. Команда `npm run deploy`, публикующая оба Worker подряд, предназначена для локального терминала: в Workers Builds используйте отдельную команду для каждого Worker. [Настройки сборки](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/) и [несколько Worker в одном репозитории](https://developers.cloudflare.com/workers/ci-cd/builds/advanced-setups/) описаны в документации Cloudflare.
+
+Если включены сборки других веток, задайте их Preview/Non-production deploy command явно: `npx wrangler deploy --dry-run -c wrangler.core.toml` для core и `npx wrangler deploy --dry-run -c wrangler.toml` для frontend. Так проверка ветки не заменит рабочий Durable Object. Для первого запуска достаточно сборок production-ветки.
+
+После публикации в **Settings → Variables & Secrets** задайте runtime-секрет `BOT_TOKEN` у `tgbotfinans-core`, а `WEBHOOK_SECRET` и `ADMIN_SECRET` — у `tgbotfinans`. Build variables доступны только во время сборки и не заменяют runtime-секреты. Далее выполните перенос данных и `manage.py configure`, как описано ниже.
+
+Ошибка `Could not detect a directory containing static files` при установке корневого `requirements.txt` означает, что Wrangler запущен без конфигурации из папки `cloudflare` или из ветки без этой версии. Проверьте Root directory, Production branch и наличие файлов `cloudflare/package.json`, `cloudflare/wrangler.toml`, `cloudflare/wrangler.core.toml` в удаленном репозитории. Создавать HTML-страницу для исправления этой ошибки не требуется.
+
+### Из локального терминала
+
 Эти команды изменяют ваш аккаунт Cloudflare; используйте основной `wrangler.toml` и `wrangler.core.toml`:
 
 ```text
