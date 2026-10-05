@@ -26,7 +26,7 @@ def test_guide_images_exist_and_survive_serialization():
 async def chat(tmp_path):
     db = Database(tmp_path / "guide.db")
     await db.initialize()
-    return Chat(Application(db, {1}, clock=lambda: datetime(2026, 9, 5, tzinfo=timezone.utc)))
+    return Chat(Application(db, clock=lambda: datetime(2026, 9, 5, tzinfo=timezone.utc)))
 
 
 class Chat:
@@ -76,7 +76,7 @@ async def test_seven_pages_back_restart_and_final_cta(chat):
     await chat.click("Далее")
     assert chat.screen.text == second
     # Recreate the app while retaining only SQLite, then use the existing button.
-    chat.app = Application(chat.app.db, {1}, clock=lambda: datetime(2026, 9, 5, tzinfo=timezone.utc))
+    chat.app = Application(chat.app.db, clock=lambda: datetime(2026, 9, 5, tzinfo=timezone.utc))
     texts = [first, second]
     for number in range(3, 8):
         await chat.click("Далее")

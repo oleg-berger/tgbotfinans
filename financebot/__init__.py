@@ -1,1 +1,1 @@
-"""Private Telegram finance tracker."""
+"""Telegram finance tracker with separate user accounts."""

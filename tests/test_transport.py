@@ -42,7 +42,7 @@ class TelegramHTTP(BaseSession):
 async def test_actual_dispatch_onboards_records_and_ignores_group(tmp_path):
     db = Database(tmp_path / "transport.db")
     await db.initialize()
-    app = Application(db, {1}, clock=lambda: datetime(2026, 9, 5, tzinfo=timezone.utc))
+    app = Application(db, clock=lambda: datetime(2026, 9, 5, tzinfo=timezone.utc))
     http = TelegramHTTP()
     bot = Bot("123456:TEST_TOKEN_NOT_REAL", session=http, default=DefaultBotProperties(parse_mode="HTML"))
     dp = Dispatcher(app=app)

@@ -14,8 +14,8 @@ log = logging.getLogger(__name__)
 
 
 class Maintenance:
-    def __init__(self, db, allowed_users, backup_dir, send):
-        self.db, self.allowed_users = db, set(allowed_users)
+    def __init__(self, db, backup_dir, send):
+        self.db = db
         self.backup_dir, self.send = Path(backup_dir), send
 
     async def tick(self, now=None):
@@ -31,8 +31,6 @@ class Maintenance:
             users = await Ledger(conn).rows("SELECT * FROM users")
         for user in users:
             uid = user["id"]
-            if uid not in self.allowed_users:
-                continue
             local = now.astimezone(ZoneInfo(user["timezone"]))
             if user["reminder_time"]:
                 hour, minute = map(int, user["reminder_time"].split(":"))

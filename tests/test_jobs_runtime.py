@@ -27,13 +27,13 @@ async def test_reminder_local_time_catchup_and_no_repeat(db, tmp_path):
     delivered = []
     async def send(uid, screen):
         delivered.append((uid, screen.text))
-    job = Maintenance(db, {1, 2}, tmp_path / "backups", send)
+    job = Maintenance(db, tmp_path / "backups", send)
     await job.tick(datetime(2026, 9, 1, 3, 59, tzinfo=timezone.utc))
     assert delivered == []
     await job.tick(datetime(2026, 9, 1, 4, 0, tzinfo=timezone.utc))
     assert [uid for uid, _ in delivered] == [1]
     # Restart after missing 09:00 in Moscow.
-    job = Maintenance(db, {1, 2}, tmp_path / "backups", send)
+    job = Maintenance(db, tmp_path / "backups", send)
     await job.tick(datetime(2026, 9, 5, 9, tzinfo=timezone.utc))
     await job.tick(datetime(2026, 9, 5, 10, tzinfo=timezone.utc))
     assert [uid for uid, _ in delivered] == [1, 2]
@@ -41,10 +41,10 @@ async def test_reminder_local_time_catchup_and_no_repeat(db, tmp_path):
     assert [uid for uid, _ in delivered] == [1, 2, 1, 2]
 
 
-async def test_failed_delivery_retries_and_removed_users_skipped(db, tmp_path):
+async def test_failed_delivery_retries_for_all_users(db, tmp_path):
     async def failed(uid, screen):
         raise OSError("offline")
-    job = Maintenance(db, {1}, tmp_path / "backups", failed)
+    job = Maintenance(db, tmp_path / "backups", failed)
     now = datetime(2026, 9, 5, tzinfo=timezone.utc)
     await job.tick(now)
     delivered = []
@@ -52,13 +52,13 @@ async def test_failed_delivery_retries_and_removed_users_skipped(db, tmp_path):
         delivered.append(uid)
     job.send = send
     await job.tick(now)
-    assert delivered == [1]
+    assert delivered == [1, 2]
 
 
 async def test_backup_is_restorable_and_retains_seven(db, tmp_path):
     async def send(uid, screen):
         pass
-    job = Maintenance(db, set(), tmp_path / "backups", send)
+    job = Maintenance(db, tmp_path / "backups", send)
     async with db.transaction() as conn:
         l = Ledger(conn)
         await l.create_bank(1, "БЦЦ", [], 1000000, "2026-09-01")
@@ -75,16 +75,19 @@ async def test_backup_is_restorable_and_retains_seven(db, tmp_path):
         assert await Ledger(conn).balance(1) == 1000000
 
 
-def test_config_rejects_missing_secret_and_bad_allowlist(monkeypatch, tmp_path):
+def test_config_requires_token_without_allowlist(monkeypatch, tmp_path):
     monkeypatch.delenv("BOT_TOKEN", raising=False)
     monkeypatch.delenv("ALLOWED_USER_IDS", raising=False)
     with pytest.raises(ValueError):
         Config.load(tmp_path / "missing.env")
     monkeypatch.setenv("BOT_TOKEN", "123456:TEST_TOKEN_NOT_REAL")
-    monkeypatch.setenv("ALLOWED_USER_IDS", "1,2")
     config = Config.load(tmp_path / "missing.env")
-    assert config.allowed_users == {1, 2}
+    assert config.token == "123456:TEST_TOKEN_NOT_REAL"
+    assert config.database.is_absolute()
+    # A legacy setting must not restrict access or prevent startup.
     monkeypatch.setenv("ALLOWED_USER_IDS", "all")
+    assert Config.load(tmp_path / "missing.env") == config
+    monkeypatch.setenv("BOT_TOKEN", "invalid")
     with pytest.raises(ValueError):
         Config.load(tmp_path / "missing.env")
 
@@ -98,7 +101,7 @@ def test_markup_carries_actions_and_router_constructs():
 async def test_events_older_than_thirty_days_are_purged(db, tmp_path):
     async def send(uid, screen):
         pass
-    job = Maintenance(db, set(), tmp_path / "backups", send)
+    job = Maintenance(db, tmp_path / "backups", send)
     async with db.transaction() as conn:
         await conn.execute("INSERT INTO events(user_id,event_key,response,created_at) VALUES(1,'old','{}','2026-08-01T00:00:00+00:00')")
         await conn.execute("INSERT INTO events(user_id,event_key,response,created_at) VALUES(1,'new','{}','2026-09-04T00:00:00+00:00')")
@@ -117,7 +120,7 @@ async def test_daily_reminder_at_local_time_once_and_retry(db, tmp_path):
     async def send(uid, screen):
         if "траты" in screen.text:
             delivered.append(uid)
-    job = Maintenance(db, {1, 2}, tmp_path / "backups", send)
+    job = Maintenance(db, tmp_path / "backups", send)
     # 20:30 in Qyzylorda (UTC+5) and 18:30 in Moscow (UTC+3): nobody is due yet.
     await job.tick(datetime(2026, 9, 5, 15, 30, tzinfo=timezone.utc))
     assert delivered == []

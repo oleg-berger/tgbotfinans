@@ -1,4 +1,4 @@
-"""Atomic event processing, authorization, and replay protection."""
+"""Atomic event processing, user isolation, and replay protection."""
 from datetime import datetime, timezone
 from html import escape
 from zoneinfo import ZoneInfo
@@ -10,14 +10,11 @@ from .screens import Screen
 
 
 class Application:
-    def __init__(self, db, allowed_users, clock=None):
+    def __init__(self, db, clock=None):
         self.db = db
-        self.allowed_users = set(allowed_users)
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     async def handle(self, uid, event_key, *, text=None, callback=None):
-        if uid not in self.allowed_users:
-            return Screen(f"Доступ закрыт. Передайте владельцу ваш Telegram ID: <code>{uid}</code>.")
         async with self.db.transaction() as conn:
             ledger = Ledger(conn)
             await ledger.ensure_user(uid)

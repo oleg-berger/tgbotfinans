@@ -1,7 +1,7 @@
 [project]
 name = "tgbotfinans"
 version = "0.1.0"
-description = "Private Telegram finance tracker"
+description = "Telegram finance tracker with separate user accounts"
 requires-python = ">=3.12"
 
 [tool.pytest.ini_options]

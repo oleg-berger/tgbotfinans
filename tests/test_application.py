@@ -16,7 +16,7 @@ def action(screen, label):
 async def app(tmp_path):
     db = Database(tmp_path / "app.db")
     await db.initialize()
-    return Application(db, {1, 2}, clock=lambda: NOW)
+    return Application(db, clock=lambda: NOW)
 
 
 async def send(app, text, uid=1, key=None):
@@ -47,7 +47,7 @@ async def test_onboarding_restart_unknown_training_and_duplicate(app):
     await send(app, "/start")
     await app.handle(1, "bank-setup-restart", callback="newbank")
     await send(app, "БЦЦ")
-    app = Application(app.db, {1, 2}, clock=lambda: NOW)
+    app = Application(app.db, clock=lambda: NOW)
     await send(app, "бц")
     s = await send(app, "10000")
     assert not any(text == "Да" for row in s.buttons for text, _ in row)
@@ -67,14 +67,18 @@ async def test_onboarding_restart_unknown_training_and_duplicate(app):
     assert "9 500,00" in s.text
 
 
-async def test_access_and_duplicate_parallel_messages(app):
-    denied = await send(app, "/start", uid=99)
-    assert "Доступ" in denied.text
+async def test_public_access_and_duplicate_parallel_messages(app):
+    welcome = await send(app, "/start", uid=99)
+    assert welcome.buttons
     await onboard(app)
     await asyncio.gather(*(send(app, "250", key="same") for _ in range(3)))
     async with app.db.transaction() as conn:
         assert await Ledger(conn).balance(1) == 975000
-        assert await Ledger(conn).one("SELECT * FROM users WHERE id=99") is None
+        ledger = Ledger(conn)
+        assert await ledger.one("SELECT * FROM users WHERE id=99") is not None
+        assert await ledger.balance(99) == 0
+        assert await ledger.operations(99) == []
+        assert await ledger.objects(99, "bank") == []
 
 
 async def test_cashback_buttons_confirm_and_stale_callback(app):

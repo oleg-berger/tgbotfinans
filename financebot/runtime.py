@@ -80,13 +80,13 @@ async def run(config):
     with InstanceLock(config.database.with_suffix(".lock")):
         db = Database(config.database)
         await db.initialize()
-        app = Application(db, config.allowed_users)
+        app = Application(db)
         bot = Bot(config.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         dispatcher = Dispatcher(app=app)
         dispatcher.include_router(make_router())
         async def send(uid, screen):
             await deliver(bot, uid, screen)
-        maintenance = Maintenance(db, config.allowed_users, config.backups, send)
+        maintenance = Maintenance(db, config.backups, send)
         worker = None
         try:
             await bot.delete_webhook(drop_pending_updates=False)
