@@ -71,15 +71,16 @@ async def test_actual_dispatch_onboards_records_and_ignores_group(tmp_path):
         for _ in range(6):
             await click("Далее")
         assert http.outbox[-1].media.media.path.name == "page-07.png"
-        await click("Создать категории")
-        await click("Расход")
-        await message("Продукты")
-        await message("пр")
-        await click("Банки")
-        await click("Добавить банк")
+        await click("Завершить гайд")
         await message("БЦЦ")
         await message("бц")
         await message("10000")
+        assert "Теперь настрой первый кэшбэк" in http.outbox[-1].text
+        await click("Категории")
+        await click("Расходы")
+        await click("Добавить категорию")
+        await message("Продукты")
+        await message("пр")
         update = await message("250 пр")
         assert "9 750,00" in http.outbox[-1].text
         await dp.feed_update(bot, update)

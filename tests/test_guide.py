@@ -83,35 +83,50 @@ async def test_seven_pages_back_restart_and_final_cta(chat):
         assert f"{number}/7" in chat.screen.text
         assert len(chat.screen.text) < 1024
         texts.append(chat.screen.text)
-    assert chat.action("Создать категории")
+    assert chat.action("Завершить гайд")
     assert not any("Далее" in label for row in chat.screen.buttons for label, _ in row)
     content = " ".join(texts).casefold()
     for topic in ("банк", "кэшбэк", "баланс", "csv", "перевод", "корректиров", "ключ", "часов", "удал", "доход", "расход", "архив"):
         assert topic in content
 
 
-@pytest.mark.parametrize("kind,label", [("expense", "Расход"), ("income", "Доход")])
-async def test_guide_category_creation_returns_main_menu(chat, kind, label):
+async def test_guide_first_bank_then_cashback_survives_restart(chat):
     await last_page(chat)
-    await chat.click("Создать категории")
-    await chat.click(label)
-    await chat.send(text="Моя категория")
-    screen = await chat.send(text="мк, моя")
-    for route in ("balance", "categories", "banks:0", "settings"):
-        assert any(data == route for row in screen.buttons for _, data in row)
+    await chat.click("Завершить гайд")
+    assert "Введите название банка" in chat.screen.text
+    assert "кэшбэк" not in chat.screen.text
+    await chat.send(text="БЦЦ")
+    await chat.send(text="бц")
+    chat.app = Application(chat.app.db, clock=lambda: datetime(2026, 9, 5, tzinfo=timezone.utc))
+    screen = await chat.send(text="10000")
+    assert "Теперь настрой первый кэшбэк" in screen.text
+    assert not any(label == "Да" for row in screen.buttons for label, _ in row)
     async with chat.app.db.transaction() as conn:
         l = Ledger(conn)
-        cats = await l.objects(1, "category")
-        category = next(c for c in cats if c["name"] == "Моя категория")
-        assert category["kind"] == kind
-        assert "мк" in await l.aliases(1, "category", category["id"])
+        bank = (await l.objects(1, "bank"))[0]
+        user = await l.user(1)
+        assert user["default_bank"] == bank["id"]
+        assert user["guide_completed"] and user["cashback_intro_shown"]
+        assert await l.balance(1) == 1000000
         assert await l.dialog(1) is None
-        assert await l.objects(1, "bank") == []
+        assert (await l.one("SELECT delivered FROM reminders WHERE user_id=1 AND month='2026-09'"))["delivered"] == 1
+    await chat.click("Настроить первый кэшбэк")
+    await chat.click("Прочее")
+    await chat.send(text="3")
+    await chat.click("Только для новых")
+    screen = await chat.send(text="250")
+    assert "9 750,00" in screen.text and "7,50" in screen.text
+    await chat.send(callback="newbank")
+    await chat.send(text="Kaspi")
+    await chat.send(text="-")
+    await chat.send(text="0")
+    screen = await chat.click("Нет")
+    assert "Теперь настрой первый" not in screen.text
 
 
 async def test_restarting_guide_preserves_accounts_and_rejects_old_choice(chat):
     await last_page(chat)
-    old = chat.action("Создать категории")
+    old = chat.action("Завершить гайд")
     async with chat.app.db.transaction() as conn:
         l = Ledger(conn)
         await l.create_bank(1, "БЦЦ", [], 1000000, "2026-09-05")
@@ -127,6 +142,31 @@ async def test_restarting_guide_preserves_accounts_and_rejects_old_choice(chat):
     await chat.send(callback="help")
     await chat.click("Пройти гайд")
     assert "1/7" in chat.screen.text
+
+
+async def test_bank_before_guide_does_not_offer_cashback_until_guide_finished(chat):
+    await chat.send(text="/menu")
+    await chat.send(callback="newbank")
+    await chat.send(text="БЦЦ")
+    await chat.send(text="-")
+    screen = await chat.send(text="0")
+    assert "Настроить первый" not in screen.text
+    async with chat.app.db.transaction() as conn:
+        assert not (await Ledger(conn).user(1))["cashback_intro_shown"]
+    await last_page(chat)
+    screen = await chat.click("Завершить гайд")
+    assert "Теперь настрой первый кэшбэк" in screen.text
+    await last_page(chat)
+    screen = await chat.click("Завершить гайд")
+    assert "Теперь настрой первый" not in screen.text
+    assert any(data == "balance" for row in screen.buttons for _, data in row)
+
+
+async def test_old_final_guide_button_continues_with_bank(chat):
+    await last_page(chat)
+    old = chat.action("Завершить гайд").replace(":finish", ":categories")
+    screen = await chat.send(callback=old)
+    assert "Введите название банка" in screen.text
 
 
 async def test_category_added_from_menu_also_returns_menu(chat):

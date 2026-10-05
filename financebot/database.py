@@ -23,6 +23,10 @@ UPDATE events SET created_at = strftime('%Y-%m-%dT%H:%M:%S+00:00','now');
 """), (3, """
 ALTER TABLE users ADD COLUMN reminder_time TEXT;
 CREATE TABLE daily_reminders(user_id INTEGER NOT NULL REFERENCES users(id), day TEXT NOT NULL, PRIMARY KEY(user_id,day));
+"""), (4, """
+ALTER TABLE users ADD COLUMN guide_completed INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN cashback_intro_shown INTEGER NOT NULL DEFAULT 0;
+UPDATE users SET guide_completed=1, cashback_intro_shown=1 WHERE EXISTS (SELECT 1 FROM banks WHERE banks.user_id=users.id);
 """)]
 
 

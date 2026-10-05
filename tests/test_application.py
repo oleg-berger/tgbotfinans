@@ -126,6 +126,36 @@ async def test_operation_edit_delete_reports_and_csv(app):
         assert await Ledger(conn).balance(1) == 1000000
 
 
+async def test_initial_balance_in_statistics_and_income_report(app):
+    await onboard(app)
+    async with app.db.transaction() as conn:
+        l = Ledger(conn)
+        second = await l.create_bank(1, "Kaspi", [], 500000, "2026-09-05")
+        first = (await l.objects(1, "bank"))[0]["id"]
+        salary = await l.create_category(1, "Зарплата", "income", ["зп"])
+        await l.record(1, 100000, "2026-09-05", first, salary)
+        await l.transfer(1, first, second, 10000, "2026-09-05")
+        await l.archive(1, "bank", second)
+    await send(app, "10000")
+    screen = await app.handle(1, "opening-stats", callback="stats:2026-09")
+    assert screen.text.count("Доходы: 16 000,00 ₸") == 2
+    assert screen.text.count("Расходы: 10 000,00 ₸") == 2
+    assert "Разница за месяц: 6 000,00 ₸" in screen.text
+    screen = await click(app, screen, "Категории")
+    screen = await click(app, screen, "Доходы")
+    assert action(screen, "Начальный остаток: 15 000,00 ₸") == "ops:2026-09:opening:0"
+    assert action(screen, "Зарплата: 1 000,00 ₸")
+    screen = await click(app, screen, "Начальный остаток")
+    assert "<b>Начальный остаток · 2026-09</b>" in screen.text
+    entries = [label for row in screen.buttons for label, route in row if route.startswith("op:")]
+    assert len(entries) == 2
+    assert all("Начальный остаток" in label for label in entries)
+    assert any("Kaspi" in label for label in entries)
+    assert any("БЦЦ" in label for label in entries)
+    screen = await click(app, screen, "БЦЦ")
+    assert "Начальный остаток · 10 000,00 ₸" in screen.text
+
+
 async def test_error_rolls_back_and_allows_retry(app):
     await onboard(app)
     await app.handle(1, "add", callback="newcat:expense")

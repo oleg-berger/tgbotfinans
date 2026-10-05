@@ -72,9 +72,36 @@ async def test_transfer_adjustment_and_delete(ledger):
     assert await ledger.balance(1) == 1000000
     await ledger.adjust(1, b2, 9000, "2026-09-05")
     assert await ledger.balance(1) == 999000
-    assert (await ledger.summary(1, "2026-09"))["income"] == 0
+    assert (await ledger.summary(1, "2026-09"))["income"] == 1000000
     await ledger.delete_operation(1, transfer["id"])
     assert await ledger.balance(1, b2) == -1000
+
+
+@pytest.mark.parametrize("opening", [1000000, 0, -50000])
+async def test_opening_counts_as_income_with_month_edits_and_deletion(ledger, opening):
+    await ledger.ensure_user(1)
+    bank = await ledger.create_bank(1, "Bank", [], opening, "2026-09-01")
+    second = await ledger.create_bank(1, "Second", [], 20000, "2026-10-01")
+    salary = await ledger.create_category(1, "Salary", "income", [])
+    await ledger.record(1, 30000, "2026-09-02", bank, salary)
+    await ledger.transfer(1, bank, second, 1000, "2026-09-03")
+    await ledger.adjust(1, bank, opening, "2026-09-04")
+    assert (await ledger.summary(1, "2026-09"))["income"] == opening + 30000
+    assert (await ledger.summary(1, "2026-10"))["income"] == 20000
+    assert (await ledger.summary(1))["income"] == opening + 50000
+    assert (await ledger.summary(1))["expense"] == 0
+    op = (await ledger.operations(1, "2026-09", kind="opening"))[0]
+    assert op["kind"] == "opening" and op["bank_id"] == bank
+    await ledger.edit_operation(1, op["id"], amount=12345, day="2026-10-02")
+    await ledger.archive(1, "bank", bank)
+    assert (await ledger.summary(1, "2026-09"))["income"] == 30000
+    assert (await ledger.summary(1, "2026-10"))["income"] == 32345
+    await ledger.delete_operation(1, op["id"])
+    assert (await ledger.summary(1))["income"] == 50000
+    assert await ledger.operations(1, "2026-09", kind="opening") == []
+    await ledger.ensure_user(2)
+    assert await ledger.operations(2, kind="opening") == []
+    assert (await ledger.summary(2))["income"] == 0
 
 
 async def test_rate_modes_edits_and_payout(ledger):

@@ -46,6 +46,11 @@ class Maintenance:
                         else:
                             async with self.db.transaction() as conn:
                                 await conn.execute("INSERT OR IGNORE INTO daily_reminders VALUES(?,?)", (uid, day))
+            if not user["guide_completed"] or not user["cashback_intro_shown"]:
+                continue
+            async with self.db.transaction() as conn:
+                if not await Ledger(conn).objects(uid, "bank"):
+                    continue
             if local < local.replace(day=1, hour=9, minute=0, second=0, microsecond=0):
                 continue
             month = local.strftime("%Y-%m")

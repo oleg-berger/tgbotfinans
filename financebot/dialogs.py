@@ -137,7 +137,13 @@ class Session(Views):
     async def finish_creation(self, data, kind, oid):
         if data.get("pending"):
             await self.l.add_aliases(self.uid, kind, oid, [data["word"]])
-            return await self.record_pending(data["pending"], data["original_today"])
+            screen = await self.record_pending(data["pending"], data["original_today"])
+            if kind == "bank" and not await self.l.dialog(self.uid):
+                intro = await self.cashback_intro(oid)
+                if intro:
+                    screen.text += "\n\n" + intro.text
+                    screen.buttons += intro.buttons
+            return screen
         await self.l.save_dialog(self.uid, None)
         if kind == "category":
             obj = await self.l.object(self.uid, kind, oid)
@@ -146,7 +152,21 @@ class Session(Views):
             if not await self.l.objects(self.uid, "bank"):
                 screen.text += "\n\n🏦 Перед первой записью добавь банк и его текущий остаток в разделе «Банки»."
             return screen
+        if kind == "bank":
+            intro = await self.cashback_intro(oid)
+            if intro:
+                return intro
         return await self.view(f"obj:{kind}:{oid}")
+
+    async def cashback_intro(self, bank):
+        user = await self.l.user(self.uid)
+        if not user["guide_completed"] or user["cashback_intro_shown"]:
+            return None
+        await self.l.object(self.uid, "bank", bank, active=True)
+        await self.l.mark_cashback_intro(self.uid, self.month)
+        return Screen("✅ Банк готов!\n\n🪙 Теперь настрой первый кэшбэк: выбери категорию расходов и укажи процент на этот месяц. Можно начать с «Прочее» или создать свою категорию через меню.\n\nПервого числа каждого следующего месяца я напомню обновить ставки.", buttons([
+            ("🪙 Настроить первый кэшбэк", f"ratepick:{self.month}:{bank}"),
+            ("🗂 Категории", "categories"), ("Позже / Меню", "menu")]))
 
     async def consume_text(self, state, text):
         step, d = state["step"], state["data"]
@@ -305,8 +325,14 @@ class Session(Views):
                 return await self.begin("guide", page=page - 1) if page else await self.begin("welcome")
             if value == "next" and page < len(GUIDE_PAGES) - 1:
                 return await self.begin("guide", page=page + 1)
-            if value == "categories" and page == len(GUIDE_PAGES) - 1:
-                return await self.begin("category_kind")
+            if value in ("finish", "categories") and page == len(GUIDE_PAGES) - 1:
+                # Accept the former final-page action for dialogs saved before the update.
+                await self.l.complete_guide(self.uid)
+                banks = await self.l.objects(self.uid, "bank")
+                if not banks:
+                    return await self.begin("bank_name")
+                await self.l.save_dialog(self.uid, None)
+                return await self.cashback_intro(banks[0]["id"]) or self.menu()
         if step == "bank_default" and value in ("yes", "no"):
             oid = await self.l.create_bank(self.uid, d["name"], d["aliases"] + ([d["word"]] if d.get("pending") else []), d["opening"], self.today.isoformat())
             if value == "yes":

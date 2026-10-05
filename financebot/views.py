@@ -66,8 +66,8 @@ class Views:
             ops = await self.l.operations(self.uid, month)
             totals = {}
             for op in ops:
-                if op["kind"] == kind:
-                    key = (op["category_id"], op["category_name"])
+                if op["kind"] == kind or (kind == "income" and op["kind"] == "opening"):
+                    key = ("opening", KINDS["opening"]) if op["kind"] == "opening" else (op["category_id"], op["category_name"])
                     totals[key] = totals.get(key, 0) + op["amount"]
             items = [(f"{name}: {fmt(value)}", f"ops:{month}:{cid}:0") for (cid, name), value in sorted(totals.items(), key=lambda x: -x[1])]
             page = max(0, min(page, max(0, (len(items) - 1) // 8)))
@@ -81,9 +81,10 @@ class Views:
                 rows.append(nav)
             return Screen(f"🗂 <b>Категории · {month}</b>" + ("\nПока нет операций." if not items else ""), [[("− Расходы", f"report:{month}:expense:0:{src}"), ("+ Доходы", f"report:{month}:income:0:{src}")], *rows, self.back(back)])
         if cmd == "ops":
-            month, cat, page = p[1], int(p[2]), int(p[3])
-            ops = await self.l.operations(self.uid, None if month == "all" else month, cat or None)
-            title = "Операции" if not cat else (await self.l.object(self.uid, "category", cat))["name"]
+            month, cat, page = p[1], "opening" if p[2] == "opening" else int(p[2]), int(p[3])
+            opening = cat == "opening"
+            ops = await self.l.operations(self.uid, None if month == "all" else month, None if opening else cat or None, kind="opening" if opening else None)
+            title = KINDS["opening"] if opening else ("Операции" if not cat else (await self.l.object(self.uid, "category", cat))["name"])
             items = [(f"{op['day']} · {KINDS[op['kind']]} {fmt(op['amount'])} · {op['category_name'] or op['bank_name']}", f"op:{op['id']}") for op in ops]
             return Screen(f"🧾 <b>{e(title)} · {'все время' if month == 'all' else month}</b>" + ("\nНет операций." if not items else ""), pages(items, page, f"ops:{month}:{cat}") + [self.back("menu" if month == "all" else f"stats:{month}")])
         if cmd == "op":

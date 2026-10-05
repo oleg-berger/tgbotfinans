@@ -47,6 +47,15 @@ class Ledger:
     async def set_reminder(self, uid, value):
         await self.conn.execute("UPDATE users SET reminder_time=? WHERE id=?", (value, uid))
 
+    async def complete_guide(self, uid):
+        await self.conn.execute("UPDATE users SET guide_completed=1 WHERE id=?", (uid,))
+
+    async def mark_cashback_intro(self, uid, month):
+        month_value(month)
+        await self.conn.execute("UPDATE users SET cashback_intro_shown=1 WHERE id=?", (uid,))
+        # The welcome offer replaces the catch-up reminder for this month.
+        await self.conn.execute("INSERT INTO reminders(user_id,month,delivered) VALUES(?,?,1) ON CONFLICT(user_id,month) DO UPDATE SET delivered=1", (uid, month))
+
     async def object(self, uid, kind, oid, active=False):
         table = {"bank": "banks", "category": "categories"}.get(kind)
         if not table:
@@ -292,16 +301,18 @@ class Ledger:
         cat = await self.one("SELECT id FROM categories WHERE user_id=? AND system='cashback'", (uid,))
         return await self.insert_op(uid, "income", amount, day, bank, cat["id"], payout_month=month)
 
-    async def operations(self, uid, month=None, category=None):
+    async def operations(self, uid, month=None, category=None, *, kind=None):
         if month:
             month_value(month)
         if category:
             await self.object(uid, "category", category)
-        return await self.rows("SELECT o.*,b.name bank_name,c.name category_name,t.name target_name FROM operations o JOIN banks b ON b.id=o.bank_id LEFT JOIN categories c ON c.id=o.category_id LEFT JOIN banks t ON t.id=o.target_bank WHERE o.user_id=? AND o.deleted=0" + (" AND substr(o.day,1,7)=?" if month else "") + (" AND o.category_id=?" if category else "") + " ORDER BY o.day DESC,o.id DESC", (uid, *([month] if month else []), *([category] if category else [])))
+        if kind is not None and kind not in ("income", "expense", "opening", "transfer", "adjustment"):
+            raise ValidationError("Неизвестный тип операции.")
+        return await self.rows("SELECT o.*,b.name bank_name,c.name category_name,t.name target_name FROM operations o JOIN banks b ON b.id=o.bank_id LEFT JOIN categories c ON c.id=o.category_id LEFT JOIN banks t ON t.id=o.target_bank WHERE o.user_id=? AND o.deleted=0" + (" AND substr(o.day,1,7)=?" if month else "") + (" AND o.category_id=?" if category else "") + (" AND o.kind=?" if kind else "") + " ORDER BY o.day DESC,o.id DESC", (uid, *([month] if month else []), *([category] if category else []), *([kind] if kind else [])))
 
     async def summary(self, uid, month=None):
         ops = await self.operations(uid, month)
-        return {"income": sum(o["amount"] for o in ops if o["kind"] == "income"), "expense": sum(o["amount"] for o in ops if o["kind"] == "expense"), "budget": await self.balance(uid)}
+        return {"income": sum(o["amount"] for o in ops if o["kind"] in ("income", "opening")), "expense": sum(o["amount"] for o in ops if o["kind"] == "expense"), "budget": await self.balance(uid)}
 
     async def export_csv(self, uid, month):
         out = io.StringIO(newline="")
