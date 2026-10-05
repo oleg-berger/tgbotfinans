@@ -1,0 +1,9 @@
+[project]
+name = "tgbotfinans-cloudflare"
+version = "0.1.0"
+description = "Telegram finance bot on Python Workers and SQLite Durable Objects"
+requires-python = ">=3.13"
+dependencies = ["tzdata==2026.3"]
+
+[dependency-groups]
+dev = ["workers-runtime-sdk==1.9.2"]

@@ -1,0 +1,18 @@
+name = "tgbotfinans"
+main = "frontend.js"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+[durable_objects]
+bindings = [{ name = "FINANCE", class_name = "FinanceStore", script_name = "tgbotfinans-core" }]
+
+[triggers]
+crons = ["* * * * *"]
+
+[assets]
+directory = "assets"
+binding = "ASSETS"
+run_worker_first = true
+
+[observability]
+enabled = false

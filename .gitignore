@@ -1,4 +1,17 @@
 .venv/
+.venv-workers/
+.venv-pyodide/
+cloudflare/src/
+cloudflare/assets/
+cloudflare/.venv-workers/
+cloudflare/.venv-pyodide/
+cloudflare/python_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
+node_modules/
+dist/
+transfer/
 .env
 data/
 backups/
@@ -6,6 +19,7 @@ backups/
 *.db-*
 *.sqlite*
 *.lock
+!cloudflare/uv.lock
 __pycache__/
 .pytest_cache/
 .ruff_cache/

@@ -1,0 +1,24 @@
+Use case: infographic-diagram.
+Create a NEW replacement for page 06 of this Russian Telegram finance-bot tutorial. The supplied image is STYLE REFERENCE ONLY: preserve coinkeeper wallet logo and wordmark at top left, page number 06 top right, white background, deep navy typography, turquoise accents, delicate pale-blue borders, rounded cards, outline icons, generous margins. Tall portrait approximately 1024 x 2160, similar aspect ratio to reference. Clean legible Russian sans serif, crisp editorial infographic, all text spelled exactly, no cropped text.
+Replace all old content with the following updated tutorial. Use 4 clear vertically stacked sections, concise large readable text. Do not draw dropdown menus or input forms, use numbered instruction steps and outlined Telegram-style buttons with EXACT labels.
+Main title: "Кэшбэк: ожидаемый и полученный"
+Section 1 title: "Настрой ставку"
+Text: "Кэшбэк → месяц → банк → «+ Настроить категорию»"
+Text: "Выбери категорию расходов и введи процент."
+Show category "Продукты" and formula "250 ₸ × 3% = 7,50 ₸"
+Caption: "Ожидаемый кэшбэк пока не входит в баланс."
+Section 2 title: "Обновляй каждый месяц"
+Text: "Первое предложение — после гайда и создания банка."
+Text: "Со следующего месяца — напоминание 1-го числа в 09:00 по твоему часовому поясу."
+Button: "Копировать ставки прошлого месяца"
+Text: "При изменении ставки выбери:"
+two stacked outlined buttons "Пересчитать" and "Только для новых записей".
+Section 3 title: "Банк выплатил? Зачисли в учет"
+Text: "Открой нужный месяц и банк в разделе «Кэшбэк»."
+Turquoise primary outlined button EXACTLY: "💳 Перевести на счет"
+Text clearly emphasized: "Вся ожидаемая сумма сразу добавится к балансу как доход текущей датой."
+Small example card "Пример: +7,50 ₸ к балансу"
+Section 4 title: "Исправь при необходимости"
+Outlined button EXACTLY "Изменить выплату"
+Text: "Если фактическая сумма или дата отличаются, измени их в операции выплаты. Выплату можно удалить."
+Constraints: Match reference visual language, but reorganize layout to fit this new copy. No button named Подтвердить выплату, no date or amount input form at initial payment, no Да/Нет buttons, no false automatic bank integration. This is instructional illustration, not a website dashboard. Do not add other text. Spell «кэшбэк» consistently.

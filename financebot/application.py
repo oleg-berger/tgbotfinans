@@ -15,7 +15,7 @@ class Application:
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     async def handle(self, uid, event_key, *, text=None, callback=None):
-        async with self.db.transaction() as conn:
+        async def process(conn):
             ledger = Ledger(conn)
             await ledger.ensure_user(uid)
             cached = await ledger.one("SELECT response FROM events WHERE user_id=? AND event_key=?", (uid, event_key))
@@ -24,15 +24,15 @@ class Application:
             user = await ledger.user(uid)
             today = self.clock().astimezone(ZoneInfo(user["timezone"])).date()
             session = Session(ledger, uid, today)
-            await conn.execute("SAVEPOINT action")
+            async def action():
+                return await session.callback(callback) if callback is not None else await session.text(text or "")
             try:
-                screen = await session.callback(callback) if callback is not None else await session.text(text or "")
+                screen = await self.db.savepoint(conn, action)
             except (ValidationError, IndexError, KeyError, ValueError) as exc:
-                await conn.execute("ROLLBACK TO action")
                 message = str(exc) if isinstance(exc, ValidationError) else "Некорректный ввод или устаревшая кнопка."
                 state = await ledger.dialog(uid)
                 screen = await session.prompt(state) if state else session.menu()
                 screen.text = "⚠️ " + escape(message) + "\n\n" + screen.text
-            await conn.execute("RELEASE action")
             await conn.execute("INSERT INTO events(user_id,event_key,response,created_at) VALUES(?,?,?,?)", (uid, event_key, screen.dumps(), self.clock().astimezone(timezone.utc).isoformat(timespec="seconds")))
             return screen
+        return await self.db.atomic(process)

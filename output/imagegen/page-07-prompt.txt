@@ -1,0 +1,20 @@
+Use case: infographic-diagram.
+Create a new replacement image for page 07 of the coinkeeper Russian Telegram finance-bot tutorial. Input image is STYLE REFERENCE ONLY. Keep the reference white background, navy sans-serif text, turquoise accents, pale-blue thin borders, rounded cards, outline wallet logo and exact wordmark "coinkeeper" at top left, number "07" top right. Tall portrait about 1024 x 2160, matching the reference aspect ratio. Clean crisp readable Russian typography with ample margins and no cropping. This is an instructional infographic, NOT an actual interactive form.
+Title: "Исправления и первые шаги".
+Arrange four vertically stacked sections with attractive balanced spacing.
+1. Heading: "Исправляй записи". Text: "Открой «Операции» и выбери запись." Show a small example card labelled "Пример" with text "Расход · Продукты", "250,00 ₸", "Банк: Каспи". Below show four outlined buttons with exact text "Сумма", "Дата", "Банк", "Категория" and a separate "Удалить" button. Text: "У обычных доходов и расходов можно менять сумму, дату, банк и категорию. Удаление требует подтверждения." Do NOT show a generic Изменить button, editable text fields or a Сохранить button.
+2. Heading: "Настрой часовой пояс". Text: "Настройки → Часовой пояс". Text: "От него зависят дата записи и время напоминаний." Outline clock/calendar icon with large turquoise "09:00" and caption "Кэшбэк: 1-го числа со следующего месяца". Small text: "Помощь доступна в настройках."
+3. Heading: "Команды под рукой". A compact three-row table with exact entries:
+"/menu" — "главное меню"
+"/cancel" — "отмена ввода"
+"/start" — "приветствие и гайд"
+4. Heading: "Начнем с первого банка!" Prominent outlined turquoise action button with exact wording "Завершить гайд и создать банк".
+Below use a 3-step visual instruction sequence, NOT form fields:
+"1. Введи название банка"
+"2. Укажи ключи через запятую или «-»"
+"3. Введи текущий остаток"
+Text: "Первый банк станет основным автоматически. Начальный остаток войдет в доходы статистики."
+Then a subtle arrow to an outlined button with exact text "Настроить первый кэшбэк".
+Text: "После создания банка бот предложит настроить кэшбэк."
+Footer text: "Свои категории добавь в разделе «Категории»."
+Constraints: Preserve branding and visual style, but replace old categories-first flow completely. No Начнем с категории, no Доход/Расход category-creation form, no Сохранить. Real sequential Telegram actions, accurate labels. All Russian text must be spelled correctly. Clearly distinguish illustration example from real values. No extra content.

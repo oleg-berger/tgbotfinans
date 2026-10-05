@@ -6,13 +6,15 @@
 
 Стек: Python 3.12+, asyncio, aiogram 3, aiosqlite, SQLite, python-dotenv, zoneinfo с tzdata. Зависимости закреплены точными версиями в `requirements.txt`; тестовые зависимости — в `requirements-dev.txt`. `pyproject.toml` содержит метаданные и настройки pytest, но не конфигурацию сборки пакета или линтера.
 
+Альтернативный запуск на Cloudflare Workers Free: небольшой JavaScript frontend и приватный Python 3.13 Durable Object с SQLite. Код и настройки — в `cloudflare/`, зависимости SDK/tzdata закреплены в его `pyproject.toml`/`uv.lock`, Wrangler — в `package-lock.json`. Прикладные модули общие; локальный запуск сохраняется. Публикация, установка webhook и перенос рабочих данных — отдельные явно запрошенные действия.
+
 ## Архитектура и границы модулей
 
 Путь пользовательского события:
 
 ```text
 Telegram → runtime.make_router() → Application.handle()
-         → Database.transaction() → Session / Views → Ledger → SQLite
+         → Database.atomic() → Session / Views → Ledger → SQLite
          ← runtime.deliver() / редактирование сообщения ← Screen
 ```
 
@@ -23,6 +25,7 @@ Telegram → runtime.make_router() → Application.handle()
 | `financebot/runtime.py` | Транспорт aiogram: фильтрация личных чатов, ключи событий, клавиатуры, отправка/редактирование текста, фото и документов, long polling. |
 | `financebot/application.py` | Регистрация пользователя, определение его локальной даты, дедупликация событий, единая транзакция обработки и преобразование ошибок ввода в `Screen`. |
 | `financebot/database.py` | Последовательные миграции, WAL, соединения aiosqlite, блокировка записи, commit/rollback. |
+| `financebot/schema.py` | Общие миграции для локальной SQLite и Durable Object; `database.py` повторно экспортирует `MIGRATIONS`. |
 | `financebot/ledger.py` | Финансовые правила и SQL: банки, категории, ключи, операции, остатки, ставки, выплаты, CSV, хранение диалогов. Не зависит от Telegram. |
 | `financebot/parsing.py` | Нормализация ключей, валидация денег/дат/процентов, разбор записи, точная арифметика и форматирование сумм. |
 | `financebot/screens.py` | Независимый от aiogram `Screen`, JSON-сериализация ответа, общие кнопки и пагинация. |
@@ -30,6 +33,12 @@ Telegram → runtime.make_router() → Application.handle()
 | `financebot/dialogs.py` | `Session(Views)`: команды, многошаговые сценарии, обработка текста и callback, подтверждения и защита от устаревших кнопок. |
 | `financebot/guide.py` | Приветствие, семь страниц гайда и относительные пути к иллюстрациям `assets/guide/page-01.png` … `page-07.png`. |
 | `financebot/jobs.py` | `Maintenance`: ежедневные и ежемесячные напоминания, очистка старых событий, резервные копии раз в UTC-день. |
+| `financebot/reminders.py` | Общие для локального и облачного запуска правила и экраны напоминаний. |
+| `financebot/cloud_database.py` | Синхронный SQL-мост и `transactionSync` Durable Object за общим интерфейсом `atomic`/`savepoint`. |
+| `financebot/cloud_transport.py` | Прямой Telegram Bot API через Workers fetch, JSON/multipart, фото/CSV и редактирование. |
+| `financebot/cloud_service.py`, `financebot/snapshots.py` | Очередь доставки, обслуживание, JSON-копии, импорт, восстановление и административный сброс. |
+| `cloudflare/frontend.js`, `cloudflare/entry.py` | Проверка HTTP-секретов и Cron во frontend; сериализация всех действий в Python `FinanceStore`. |
+| `cloudflare/build.py`, `cloudflare/manage.py` | Сборка из белого списка модулей/PNG и SDK; CLI переноса и администрирования. |
 | `financebot/instance.py` | Межпроцессная блокировка ОС для одной базы; реализация для Windows и Linux. |
 | `financebot/reset_user.py` | Отдельный CLI сброса одного пользователя: предварительный просмотр, проверка схемы, копия перед удалением. |
 | `tests/` | Проверки финансовых правил, пользовательских сценариев, транспорта, обслуживания, гайда и сброса. |
@@ -41,6 +50,7 @@ Telegram → runtime.make_router() → Application.handle()
 
 - `Database.transaction()` использует `asyncio.Lock`, отдельное соединение, `foreign_keys=ON`, `busy_timeout=5000` и `BEGIN IMMEDIATE`. При исключении, включая отмену задачи, выполняется rollback.
 - `Ledger` получает готовое соединение. Он не открывает собственные транзакции и не делает commit: транзакцией владеет вызывающий код.
+- Общий интерфейс хранилищ: `atomic(action)` и `savepoint(conn, action)`. На Cloudflare await внутри финансовой транзакции обязан завершаться синхронно: разрешены только вызовы SQL-моста. `complete()` отклоняет реальное асинхронное ожидание и откатывает транзакцию. Сеть, таймеры и фоновые задачи внутри транзакции запрещены.
 - `Application.handle()` сохраняет изменения операций, диалога и сериализованный ответ в `events` одной транзакцией. Повтор `(user_id, event_key)` возвращает сохраненный ответ. Сохраняйте эту атомарность.
 - Ключи транспорта: `m:{chat_id}:{message_id}` для сообщений и `c:{callback_id}` для callback. Одинаковый текст с разными ключами — разные события.
 - Внутри обработки используется `SAVEPOINT action`: ошибка валидации откатывает действие, после чего сохраняется экран с ошибкой. Неожиданное исключение откатывает всю транзакцию.
@@ -49,7 +59,7 @@ Telegram → runtime.make_router() → Application.handle()
 - Таблицы: `users`, `banks`, `categories`, `aliases`, `operations`, `rates`, `dialogs`, `events`, `reminders`, `daily_reminders`; `schema_version` хранит версии миграций.
 - Все обращения к пользовательским объектам проверяют владельца через `uid`/`user_id`. ID из callback не доказывает право доступа. Для нового ввода проверяйте также `active=True`.
 - Значения SQL передаются параметрами `?`. Динамические имена таблиц/столбцов допустимы только из контролируемых вариантов, как в существующих методах.
-- Изменения схемы добавляйте новой версией в конец `MIGRATIONS`; не переписывайте примененные миграции. Сейчас есть версии 1–4; неизвестная более новая база отклоняется при старте. Версия 4 добавляет `guide_completed` и `cashback_intro_shown`; существующие пользователи с банками считаются прошедшими знакомство.
+- Изменения схемы добавляйте новой версией в конец `MIGRATIONS`; не переписывайте примененные миграции. Сейчас есть версии 1–5; неизвестная более новая база отклоняется при старте. Версия 4 добавляет `guide_completed` и `cashback_intro_shown`; существующие пользователи с банками считаются прошедшими знакомство. Версия 5 индексирует даты `events` и `daily_reminders`, чтобы минутная очистка не сканировала всю историю и не расходовала квоту Cloudflare. Снимки версии 4 совместимы с версией 5: столбцы не изменились.
 - При добавлении пользовательской таблицы обновляйте `reset_user.USER_TABLES`, порядок удаления и тесты сброса: утилита проверяет точное совпадение списка таблиц.
 - Проверяйте миграции как на новой базе, так и на базе предыдущей версии. Для этого используйте временные базы.
 
@@ -132,5 +142,7 @@ Telegram → runtime.make_router() → Application.handle()
 - Docker использует Python 3.12, UID/GID `10001`, bind mounts `data/` и `backups/`; Compose переопределяет пути из `.env` на `/app/data/finance.sqlite3` и `/app/backups`. Входящие HTTP-порты не нужны.
 
 ## Перед завершением задачи
+
+Для Cloudflare также запускайте прежние сценарии с `--cloud-storage` (`test_finance.py`, `test_application.py`, `test_guide.py`), `tests/test_cloudflare*.py`, сборку `npm run check` и при изменении транспортного адаптера локальный `npm run test:runtime` + `uv run python test/smoke.py`. Подробности — `cloudflare/README.md`. Не публикуйте тестовые конфигурации со stub Telegram и открытыми секретами. Не переименовывайте `FinanceStore`, namespace, миграцию `v1` или объект `finance-v1` после начала эксплуатации. Общая блокировка Durable Object охватывает финансовые действия, доставку, Cron и администрирование. JSON-снимки и `transfer/` содержат финансовые данные и исключены из Git.
 
 Проверьте, что изменение соответствует границам модулей, изоляции пользователей, денежной точности и атомарности. Выполните проверки, подходящие к изменению, и сообщите их результат и ограничения. Не меняйте чужие незавершенные правки. Обновляйте этот файл при существенном изменении архитектуры или рабочих соглашений.

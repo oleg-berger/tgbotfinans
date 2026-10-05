@@ -1,0 +1,29 @@
+# Local only: synthetic token and mock Telegram service.
+name = "tgbotfinans-core-test"
+main = "src/worker.py"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["python_workers"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+BOT_TOKEN = "000000:test"
+
+[durable_objects]
+bindings = [{ name = "FINANCE", class_name = "FinanceStore" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["FinanceStore"]
+
+[[services]]
+binding = "TELEGRAM_API"
+service = "financebot-telegram-test"
+
+[assets]
+directory = "assets"
+binding = "ASSETS"
+run_worker_first = true
+
+[observability]
+enabled = false

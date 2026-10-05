@@ -1,0 +1,13 @@
+{
+  "name": "tgbotfinans-cloudflare",
+  "private": true,
+  "scripts": {
+    "check": "wrangler deploy --dry-run -c wrangler.core.toml --outdir dist/core && wrangler deploy --dry-run --outdir dist/frontend",
+    "dev": "wrangler dev -c wrangler.toml -c wrangler.core.toml",
+    "test:runtime": "wrangler dev -c wrangler.test.toml -c wrangler.core.test.toml -c test/telegram.toml --port 8790 --ip 127.0.0.1 --test-scheduled --persist-to .wrangler/test-state",
+    "deploy": "wrangler deploy -c wrangler.core.toml && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.147.0"
+  }
+}

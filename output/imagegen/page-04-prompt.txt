@@ -1,0 +1,22 @@
+Use case: infographic-diagram.
+Create a NEW replacement illustration for page 04 of the coinkeeper Russian Telegram finance-bot guide. Input is STYLE REFERENCE ONLY. Preserve exact wordmark "coinkeeper" and outlined wallet logo at top left, page number "04" top right, white background, navy typography, turquoise accents, pale-blue thin borders, softly rounded cards and elegant outline icons. Tall portrait approximately 1024 x 2160, same aspect ratio as supplied reference. Crisp, readable, correctly spelled Russian text. Balanced spacing and safe margins. No clipping.
+Title: "Баланс: сколько денег сейчас"
+Intro text: "Раздел «Баланс» показывает сумму остатков всех твоих банков. Это твой текущий бюджет."
+Section 1: A clearly marked "Пример" card with heading "Общий баланс" and large navy "150 000,00 ₸". Under it two clean example rows:
+"Каспи" — "100 000,00 ₸"
+"БЦЦ" — "50 000,00 ₸".
+Small caption: "Архивные банки тоже входят в общий баланс."
+Below two side-by-side small cards with outline arrows:
+"Доход" / "увеличивает остаток"
+"Расход" / "уменьшает остаток".
+Section 2: Gift outline icon, heading "Ожидаемый кэшбэк — отдельно". Text: "Он не входит в баланс, пока ты не зачислишь выплату в учет." This is manually tracked money, no bank integration.
+Section 3 heading: "Посмотри остатки и отчеты". Illustrate the exact Telegram button labels as three outlined full-width buttons, WITHOUT dashboard graphs or dropdowns:
+"Баланс каждого банка"
+"Отчет по категориям"
+"Статистика".
+Text: "Открой остатки банков, отчет по категориям или статистику."
+Section 4, visually important turquoise-tinted card: heading "Начальный остаток — в доходах". Text exactly: "Сумма при создании банка входит в доходы за месяц создания и за все время."
+Small report illustration labelled "Пример отчета доходов" with line "Начальный остаток: 10 000,00 ₸".
+Text: "Нажми эту строку, чтобы открыть начальные остатки банков."
+Final small note: "Это одна операция: баланс не удваивается."
+Constraints: Teach current finance-bot behavior. Remove old statement that initial balances are excluded from income. Initial balances remain distinct opening operations grouped in income report. Clearly distinguish example values from real account values. Use consistent currency symbol ₸, space thousands separator and decimal comma. Do not add buttons unavailable in current balance screen. No extra prose, no watermark, keep coherent series branding.

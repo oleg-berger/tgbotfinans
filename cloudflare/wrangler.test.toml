@@ -1,0 +1,24 @@
+# Local integration tests only. Never deploy this configuration.
+name = "tgbotfinans-test"
+main = "frontend.js"
+compatibility_date = "2026-08-01"
+workers_dev = false
+
+[vars]
+TEST_MODE = "local"
+WEBHOOK_SECRET = "test-webhook"
+ADMIN_SECRET = "test-admin"
+
+[durable_objects]
+bindings = [{ name = "FINANCE", class_name = "FinanceStore", script_name = "tgbotfinans-core-test" }]
+
+[assets]
+directory = "assets"
+binding = "ASSETS"
+run_worker_first = true
+
+[triggers]
+crons = ["* * * * *"]
+
+[observability]
+enabled = false

@@ -218,9 +218,15 @@ class Ledger:
         return total
 
     async def balances(self, uid):
-        totals = {r["bank_id"]: r["total"] for r in await self.rows("SELECT bank_id, SUM(CASE WHEN kind IN ('expense','transfer') THEN -amount ELSE amount END) total FROM operations WHERE user_id=? AND deleted=0 GROUP BY bank_id", (uid,))}
-        for r in await self.rows("SELECT target_bank, SUM(amount) total FROM operations WHERE user_id=? AND deleted=0 AND kind='transfer' GROUP BY target_bank", (uid,)):
-            totals[r["target_bank"]] = totals.get(r["target_bank"], 0) + r["total"]
+        # Aggregate integers in Python: Cloudflare SQL cursors cross JavaScript's
+        # number boundary, whereas a bank total may exceed 2**53.
+        totals = {}
+        for op in await self.rows("SELECT bank_id,target_bank,kind,amount FROM operations WHERE user_id=? AND deleted=0", (uid,)):
+            bid = op["bank_id"]
+            totals[bid] = totals.get(bid, 0) + (-op["amount"] if op["kind"] in ("expense", "transfer") else op["amount"])
+            if op["kind"] == "transfer":
+                target = op["target_bank"]
+                totals[target] = totals.get(target, 0) + op["amount"]
         return totals
 
     async def transfer(self, uid, source, target, amount, day):
