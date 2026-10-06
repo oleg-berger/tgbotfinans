@@ -126,6 +126,7 @@ def main(argv=None):
     convert.add_argument("output")
     commands.add_parser("configure", help="Установить webhook и прежнее меню Telegram")
     commands.add_parser("telegram-status")
+    commands.add_parser("probe-webhook", help="Проверить обработку пустого webhook без финансового события")
     commands.add_parser("disconnect", help="Удалить webhook для возврата к polling")
     export = commands.add_parser("export")
     export.add_argument("output")
@@ -160,7 +161,14 @@ def main(argv=None):
             return result["result"]
         if args.action == "telegram-status":
             info = telegram("getWebhookInfo", {})
-            print(json.dumps({key: info.get(key) for key in ("url", "pending_update_count", "last_error_date", "max_connections", "allowed_updates")}, ensure_ascii=False, indent=2))
+            status = {key: info.get(key) for key in ("url", "pending_update_count", "last_error_date", "max_connections", "allowed_updates")}
+            message = info.get("last_error_message")
+            if message:
+                # Error details help distinguish authentication and runtime failures.
+                message = str(message).replace(token, "[TOKEN]")
+                message = re.sub(r"https?://\S+", "[URL]", message)
+                status["last_error_message"] = message
+            print(json.dumps(status, ensure_ascii=False, indent=2))
             return
         if args.action == "disconnect":
             telegram("deleteWebhook", {"drop_pending_updates": False})
@@ -169,16 +177,29 @@ def main(argv=None):
         parsed = urlparse(args.url or "")
         if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment or parsed.path not in ("", "/"):
             raise ValueError("Укажите --url с HTTPS адресом Worker без пути.")
-        secret = getpass.getpass("WEBHOOK_SECRET (такой же, как секрет Worker): ").strip()
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,256}", secret):
-            raise ValueError("Секрет webhook: 1–256 символов A-Z, a-z, 0-9, _ и -.")
         telegram("setMyCommands", {"commands": [{"command": key, "description": label} for key, label in COMMANDS]})
-        telegram("setWebhook", {"url": args.url.rstrip("/") + "/webhook", "secret_token": secret, "max_connections": 1, "allowed_updates": ["message", "callback_query"], "drop_pending_updates": False})
+        telegram("setWebhook", {"url": args.url.rstrip("/") + "/webhook", "secret_token": "", "max_connections": 1, "allowed_updates": ["message", "callback_query"], "drop_pending_updates": False})
         print("Webhook и меню команд настроены. Отправьте боту /start.")
         return
     parsed = urlparse(args.url or "")
     if not parsed.netloc or parsed.path not in ("", "/") or parsed.query or parsed.fragment or not (parsed.scheme == "https" or parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "localhost")):
         raise ValueError("Укажите --url с HTTPS адресом Worker без пути.")
+    if args.action == "probe-webhook":
+        call = Request(args.url.rstrip("/") + "/webhook", b"{}", {
+            "Content-Type": "application/json",
+        }, method="POST")
+        try:
+            with urlopen(call, timeout=30) as response:
+                print(f"HTTP {response.status}: Worker обработал пустой запрос без секрета.")
+        except HTTPError as exc:
+            if exc.code == 403:
+                raise ValueError("HTTP 403: проверьте, опубликована ли версия frontend без проверки WEBHOOK_SECRET.") from None
+            if exc.code == 503:
+                raise ValueError("HTTP 503: ошибка внутри Worker/core. Нужны логи.") from None
+            raise ValueError(f"Worker ответил HTTP {exc.code}.") from None
+        except URLError:
+            raise ValueError("Не удалось подключиться к Worker.") from None
+        return
     secret = getpass.getpass("ADMIN_SECRET: ").strip()
     if not secret:
         raise ValueError("ADMIN_SECRET не может быть пустым.")

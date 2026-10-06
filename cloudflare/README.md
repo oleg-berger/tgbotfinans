@@ -5,7 +5,7 @@
 ## Как устроена версия
 
 ```text
-Telegram webhook → frontend.js (проверка секрета)
+Telegram webhook → frontend.js (без проверки секрета webhook)
                  → FinanceStore в tgbotfinans-core (Python Durable Object)
                  → Application → Session / Views → Ledger → SQLite
                  → сохраненный ответ / очередь доставки → Telegram Bot API
@@ -54,7 +54,9 @@ npm run check
 
 Если включены сборки других веток, задайте их Preview/Non-production deploy command явно: `npx wrangler deploy --dry-run -c wrangler.core.toml` для core и `npx wrangler deploy --dry-run -c wrangler.toml` для frontend. Так проверка ветки не заменит рабочий Durable Object. Для первого запуска достаточно сборок production-ветки.
 
-После публикации в **Settings → Variables & Secrets** задайте runtime-секрет `BOT_TOKEN` у `tgbotfinans-core`, а `WEBHOOK_SECRET` и `ADMIN_SECRET` — у `tgbotfinans`. Build variables доступны только во время сборки и не заменяют runtime-секреты. Далее выполните перенос данных и `manage.py configure`, как описано ниже.
+После публикации в **Settings → Runtime variables and secrets** задайте runtime-секрет `BOT_TOKEN` у `tgbotfinans-core`, а `ADMIN_SECRET` — у `tgbotfinans` для администрирования. `WEBHOOK_SECRET` больше не используется. Build variables доступны только во время сборки и не заменяют runtime-секреты. Далее выполните перенос данных и `manage.py configure`, как описано ниже.
+
+По запросу владельца `/webhook` принимает POST без проверки секрета. Зная публичный адрес и Telegram ID пользователя, посторонний может подделать события и изменить его данные. `/admin/` по-прежнему требует `ADMIN_SECRET`; core остается приватным.
 
 Ошибка `Could not detect a directory containing static files` при установке корневого `requirements.txt` означает, что Wrangler запущен без конфигурации из папки `cloudflare` или из ветки без этой версии. Проверьте Root directory, Production branch и наличие файлов `cloudflare/package.json`, `cloudflare/wrangler.toml`, `cloudflare/wrangler.core.toml` в удаленном репозитории. Создавать HTML-страницу для исправления этой ошибки не требуется.
 
@@ -66,11 +68,10 @@ npm run check
 npx wrangler login
 npm run deploy
 npx wrangler secret put BOT_TOKEN -c wrangler.core.toml
-npx wrangler secret put WEBHOOK_SECRET
 npx wrangler secret put ADMIN_SECRET
 ```
 
-Wrangler сначала публикует core с SQLite Durable Object, затем frontend. `BOT_TOKEN` — токен BotFather, `WEBHOOK_SECRET` — случайная строка из букв, цифр, `_` и `-`, `ADMIN_SECRET` — отдельный длинный случайный секрет. Ввод производится по запросу Wrangler; токены не записываются в TOML. Без секретов frontend отклоняет webhook и администрирование. Сохраните секреты в менеджере паролей.
+Wrangler сначала публикует core с SQLite Durable Object, затем frontend. `BOT_TOKEN` — токен BotFather, `ADMIN_SECRET` — длинный случайный секрет администрирования. Ввод производится по запросу Wrangler; токены не записываются в TOML. Без `ADMIN_SECRET` frontend отклоняет администрирование; для webhook секрет не нужен. Сохраните секреты в менеджере паролей.
 
 Публичный адрес будет вида `https://tgbotfinans.<ваш-поддомен>.workers.dev`. Откройте `/health`: он должен ответить `{"status":"ok"}`. Эта проверка подтверждает доступность frontend; доступ к базе проверяется командой `backups` ниже.
 
@@ -81,7 +82,7 @@ uv run --python 3.13 --locked python manage.py --url https://tgbotfinans.ВАШ-
 uv run --python 3.13 --locked python manage.py telegram-status
 ```
 
-`configure` запросит токен и тот же `WEBHOOK_SECRET`, установит прежние 12 команд, webhook `/webhook`, только `message`/`callback_query` и `max_connections=1`. Ожидающие обновления не удаляются. Отправьте `/start`, пройдите гайд, создайте банк и проверьте запись, статистику и CSV в Telegram. Проверка реальным Telegram и фактических лимитов аккаунта выполняется после публикации; локальные тесты не заменяют ее.
+`configure` запросит только токен, установит прежние 12 команд, webhook `/webhook` без секрета, только `message`/`callback_query` и `max_connections=1`. Ожидающие обновления не удаляются. `manage.py --url АДРЕС probe-webhook` проверяет обработку пустого POST без создания финансовой операции. Отправьте `/start`, пройдите гайд, создайте банк и проверьте запись, статистику и CSV в Telegram. Проверка реальным Telegram и фактических лимитов аккаунта выполняется после публикации; локальные тесты не заменяют ее.
 
 ## Перенос существующих данных
 

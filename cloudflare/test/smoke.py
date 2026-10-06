@@ -29,9 +29,9 @@ def run(url):
             return json.loads(body) if body.startswith(b"{") else body.decode()
     assert call("/health").get("test_mode") is True, "Use wrangler.test.toml with Telegram stub"
     call("/admin/export", {}, expected=403)
-    call("/webhook", {}, expected=403)
+    call("/webhook", {})
     admin_headers = {"Authorization": "Bearer test-admin"}
-    webhook_headers = {"X-Telegram-Bot-Api-Secret-Token": "test-webhook"}
+    webhook_headers = {}
     def admin(action, payload=None, expected=200):
         return call("/admin/" + action, payload or {}, admin_headers, expected)
     for page in range(1, 8):

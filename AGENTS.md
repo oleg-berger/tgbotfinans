@@ -37,7 +37,7 @@ Telegram → runtime.make_router() → Application.handle()
 | `financebot/cloud_database.py` | Синхронный SQL-мост и `transactionSync` Durable Object за общим интерфейсом `atomic`/`savepoint`. |
 | `financebot/cloud_transport.py` | Прямой Telegram Bot API через Workers fetch, JSON/multipart, фото/CSV и редактирование. |
 | `financebot/cloud_service.py`, `financebot/snapshots.py` | Очередь доставки, обслуживание, JSON-копии, импорт, восстановление и административный сброс. |
-| `cloudflare/frontend.js`, `cloudflare/entry.py` | Проверка HTTP-секретов и Cron во frontend; сериализация всех действий в Python `FinanceStore`. |
+| `cloudflare/frontend.js`, `cloudflare/entry.py` | Проверка административного HTTP-секрета и Cron во frontend; сериализация всех действий в Python `FinanceStore`. По явному запросу владельца webhook принимает POST без секрета; `configure` спрашивает только токен. |
 | `cloudflare/build.py`, `cloudflare/manage.py` | Сборка из белого списка модулей/PNG и SDK; CLI переноса и администрирования. |
 | `financebot/instance.py` | Межпроцессная блокировка ОС для одной базы; реализация для Windows и Linux. |
 | `financebot/reset_user.py` | Отдельный CLI сброса одного пользователя: предварительный просмотр, проверка схемы, копия перед удалением. |

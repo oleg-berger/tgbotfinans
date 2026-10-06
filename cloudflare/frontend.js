@@ -22,15 +22,11 @@ export default {
       return Response.json(env.TEST_MODE === "local" ? {status: "ok", test_mode: true} : {status: "ok"});
     }
     if (GUIDE.has(path) && request.method === "GET") return env.ASSETS.fetch(request);
-    if (path === "/webhook" && request.method === "POST") {
-      if (!authorized(request.headers.get("X-Telegram-Bot-Api-Secret-Token"), env.WEBHOOK_SECRET)) {
-        return new Response("Forbidden", {status: 403});
-      }
-    } else if (path.startsWith("/admin/") && request.method === "POST") {
+    if (path.startsWith("/admin/") && request.method === "POST") {
       if (!authorized(request.headers.get("Authorization"), env.ADMIN_SECRET ? `Bearer ${env.ADMIN_SECRET}` : "")) {
         return new Response("Forbidden", {status: 403});
       }
-    } else {
+    } else if (path !== "/webhook" || request.method !== "POST") {
       return new Response("Not found", {status: 404});
     }
     const length = request.headers.get("Content-Length");

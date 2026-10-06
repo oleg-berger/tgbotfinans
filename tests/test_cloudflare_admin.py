@@ -82,7 +82,7 @@ def test_sqlite_export_rejects_missing_source(tmp_path):
 
 
 def test_configure_webhook_keeps_updates_and_serial_delivery(monkeypatch):
-    secrets = iter(("123456:fake_token", "secret-123"))
+    secrets = iter(("123456:fake_token",))
     monkeypatch.setattr(manage.getpass, "getpass", lambda prompt: next(secrets))
     calls = []
     def request(url, payload, headers=None):
@@ -92,7 +92,7 @@ def test_configure_webhook_keeps_updates_and_serial_delivery(monkeypatch):
     manage.main(["--url", "https://example.workers.dev", "configure"])
     assert calls[0][0].endswith("/setMyCommands")
     assert len(calls[0][1]["commands"]) == 12
-    assert calls[1][1] == {"url": "https://example.workers.dev/webhook", "secret_token": "secret-123", "max_connections": 1, "allowed_updates": ["message", "callback_query"], "drop_pending_updates": False}
+    assert calls[1][1] == {"url": "https://example.workers.dev/webhook", "secret_token": "", "max_connections": 1, "allowed_updates": ["message", "callback_query"], "drop_pending_updates": False}
 
 
 def test_admin_preview_and_confirmation_are_explicit(monkeypatch):
@@ -119,3 +119,34 @@ def test_cli_http_error_never_prints_telegram_token(monkeypatch):
 def test_admin_rejects_cleartext_remote_url():
     with pytest.raises(ValueError, match="HTTPS"):
         manage.main(["--url", "http://example.com", "backup"])
+
+
+def test_telegram_status_reports_delivery_error_without_secrets(monkeypatch, capsys):
+    token = "123456:fake_token"
+    monkeypatch.setattr(manage.getpass, "getpass", lambda prompt: token)
+    monkeypatch.setattr(manage, "request", lambda url, payload: {
+        "ok": True, "result": {
+            "pending_update_count": 4,
+            "last_error_message": f"Wrong response: 503 Service Unavailable https://example.com/{token} token={token}",
+        },
+    })
+    manage.main(["telegram-status"])
+    output = capsys.readouterr().out
+    assert "503 Service Unavailable" in output
+    assert "last_error_message" in output
+    assert token not in output
+    assert "example.com" not in output
+
+
+@pytest.mark.parametrize("code", [403, 503])
+def test_webhook_probe_distinguishes_auth_and_runtime_failures(monkeypatch, code):
+    monkeypatch.setattr(manage.getpass, "getpass", lambda prompt: "private-secret")
+    def fail(call, timeout):
+        assert call.data == b"{}"
+        assert call.get_header("X-telegram-bot-api-secret-token") is None
+        raise HTTPError(call.full_url, code, "Failed", {}, None)
+    monkeypatch.setattr(manage, "urlopen", fail)
+    with pytest.raises(ValueError) as error:
+        manage.main(["--url", "https://example.workers.dev", "probe-webhook"])
+    assert f"HTTP {code}" in str(error.value)
+    assert "private-secret" not in str(error.value)
